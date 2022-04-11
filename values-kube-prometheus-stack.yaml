@@ -1,0 +1,173 @@
+# Default values for kube-prometheus-stack.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## Override the deployment namespace
+##
+namespaceOverride: "monitoring"
+
+## Configuration for alertmanager
+## ref: https://prometheus.io/docs/alerting/alertmanager/
+##
+alertmanager:
+
+  ## Service account for Alertmanager to use.
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+  ##
+  serviceAccount:
+    create: true
+    name: "alert-manager-svc-acc"
+
+  ## Settings affecting alertmanagerSpec
+  ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#alertmanagerspec
+  ##
+  alertmanagerSpec:
+
+    ## Pod anti-affinity can prevent the scheduler from placing Prometheus replicas on the same node.
+    ## The default value "soft" means that the scheduler should *prefer* to not schedule two replica pods onto the same node but no guarantee is provided.
+    ## The value "hard" means that the scheduler is *required* to not schedule two replica pods onto the same node.
+    ## The value "" will disable pod anti-affinity so that no anti-affinity rules will be configured.
+    ##
+    podAntiAffinity: "hard"
+
+
+## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
+##
+grafana:
+  enabled: true
+  namespaceOverride: "monitoring"
+
+  ## Timezone for the default dashboards
+  ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
+  ##
+  defaultDashboardsTimezone: browser
+
+  adminPassword: prom-operator
+
+  ingress:
+    ## If true, Grafana Ingress will be created
+    ##
+    enabled: true
+
+    ## IngressClassName for Grafana Ingress.
+    ## Should be provided if Ingress is enable.
+    ##
+    # ingressClassName: traefik
+
+    ## Annotations for Grafana Ingress
+    ##
+    annotations: {
+      kubernetes.io/ingress.class: "traefik", 
+      cert-manager.io/cluster-issuer: letsencrypt-prod-grafana,
+      ingress.kubernetes.io/ssl-redirect: "true"
+    }
+
+    ## Hostnames.
+    ## Must be provided if Ingress is enable.
+    ##
+    # hosts:
+    #   - grafana.domain.com
+    hosts: 
+      - grafana.learninsk8s.ml
+
+    ## Path for grafana ingress
+    path: /
+
+    ## TLS configuration for grafana Ingress
+    ## Secret must be manually created in the namespace
+    ##
+    tls:
+      - secretName: letsencrypt-prod-grafana
+        hosts:
+          - grafana.learninsk8s.ml
+    # - secretName: grafana-general-tls
+    #   hosts:
+    #   - grafana.example.com
+
+  ## Passed to grafana subchart and used by servicemonitor below
+  ##
+  service:
+    portName: http-web
+
+    ## Port for Grafana Service to listen on
+    ##
+    port: 3000
+
+## Configuration for kube-state-metrics subchart
+##
+kube-state-metrics:
+  namespaceOverride: "monitoring"
+
+## Configuration for prometheus-node-exporter subchart
+##
+prometheus-node-exporter:
+  namespaceOverride: "monitoring"
+  service:
+    portName: http-metrics
+    ## Port for node-exporter Service to listen on
+    ##
+    port: 9100
+
+## Manages Prometheus and Alertmanager components
+##
+prometheusOperator:
+
+  prometheusConfigReloader:
+
+    # resource config for prometheusConfigReloader
+    resources:
+      requests:
+        cpu: 200m
+        memory: 50Mi
+      limits:
+        cpu: 200m
+        memory: 50Mi
+
+## Deploy a Prometheus instance
+##
+prometheus:
+
+  ingress:
+    enabled: true
+
+    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+    # ingressClassName: traefik
+
+    annotations: {
+      kubernetes.io/ingress.class: "traefik", 
+      cert-manager.io/cluster-issuer: letsencrypt-prod-prom,
+      ingress.kubernetes.io/ssl-redirect: "true"
+    }
+    labels: {}
+
+    ## Hostnames.
+    ## Must be provided if Ingress is enabled.
+    ##
+    # hosts:
+    #   - prometheus.domain.com
+    hosts: 
+      - prometheus.learninsk8s.ml
+
+    ## Paths to use for ingress rules - one path should match the prometheusSpec.routePrefix
+    ##
+    paths: 
+      - /
+    
+    # - /
+
+    ## For Kubernetes >= 1.18 you should specify the pathType (determines how Ingress paths should be matched)
+    ## See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#better-path-matching-with-path-types
+    # pathType: ImplementationSpecific
+
+    ## TLS configuration for Prometheus Ingress
+    ## Secret must be manually created in the namespace
+    ##
+    tls:
+      - secretName: letsencrypt-prod-prom
+        hosts:
+          - prometheus.learninsk8s.ml
+      # - secretName: prometheus-general-tls
+      #   hosts:
+      #     - prometheus.example.com
+
